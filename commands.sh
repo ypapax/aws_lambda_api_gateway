@@ -52,4 +52,39 @@ run(){
 	echo
 }
 
+create_restapi(){
+#	https://docs.aws.amazon.com/apigateway/latest/developerguide/create-api-using-awscli.html
+	apiID=$(aws apigateway create-rest-api --name 'rest-api-for-golang' --region $REGION | jq -r .id)
+	resourceID=$(aws apigateway get-resources --rest-api-id $apiID --region $REGION | jq -r '.items | .[0] | .id')
+
+	resourceID=$(aws apigateway create-resource --rest-api-id $apiID \
+      --region $REGION \
+      --parent-id $resourceID \
+      --path-part greeting | jq -r .id)
+
+   aws apigateway put-method --rest-api-id $apiID \
+       --region $REGION \
+       --resource-id $resourceID \
+       --http-method GET \
+       --authorization-type "NONE" \
+       --request-parameters method.request.querystring.greeter=false
+
+   aws apigateway put-method-response \
+        --region $REGION \
+        --rest-api-id $apiID \
+        --resource-id $resourceID \
+        --http-method GET \
+        --status-code 200
+
+   aws apigateway put-integration \
+        --region $REGION \
+        --rest-api-id $apiID \
+        --resource-id $resourceID \
+        --http-method GET \
+        --type AWS \
+        --integration-http-method POST \
+        --uri arn:aws:apigateway:$REGION:lambda:path/2015-03-31/functions/arn:aws:lambda:$REGION:123456789012:function:$FUNCTION_NAME/invocations \
+        --request-templates file://./integration-request-template.json \
+        --credentials $ARN
+}
 $@
